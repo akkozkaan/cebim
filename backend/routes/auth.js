@@ -13,7 +13,10 @@ router.get('/google/callback',
   passport.authenticate('google', { failureRedirect: '/login' }),
   (req, res) => {
     const token = jwt.sign({ id: req.user._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
-    res.redirect(`http://localhost:3000/auth-success?token=${token}`);
+    const frontendUrl = process.env.NODE_ENV === 'production'
+      ? 'https://cebim-frontend.vercel.app'
+      : 'http://localhost:3000';
+    res.redirect(`${frontendUrl}/auth-success?token=${token}`);
   }
 );
 

@@ -4,10 +4,17 @@ const JwtStrategy = require('passport-jwt').Strategy;
 const ExtractJwt = require('passport-jwt').ExtractJwt;
 const User = require('../models/User');
 
+const isProduction = process.env.NODE_ENV === 'production';
+const callbackURL = isProduction
+  ? "https://backend-seven-xi-20.vercel.app/auth/google/callback"
+  : "http://localhost:5000/auth/google/callback";
+
+console.log('Using callback URL:', callbackURL); // Debug log
+
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: "http://localhost:5000/auth/google/callback"
+    callbackURL: callbackURL
   },
   async function(accessToken, refreshToken, profile, cb) {
     try {

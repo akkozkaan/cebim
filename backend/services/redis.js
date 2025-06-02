@@ -9,27 +9,39 @@ class RedisService {
   async connect() {
     try {
       this.client = createClient({
-        url: 'redis://localhost:6379'
+        url: process.env.REDIS_URL || 'redis://localhost:6379',
+        socket: {
+          tls: true,
+          rejectUnauthorized: false
+        }
       });
 
-      this.client.on('error', (err) => console.error('Redis Client Error:', err));
+      this.client.on('error', (err) => {
+        console.error('Redis Client Error:', err);
+        // Don't throw error, just log it
+      });
+      
       this.client.on('connect', () => console.log('Redis bağlantısı başarılı'));
 
       await this.client.connect();
     } catch (error) {
       console.error('Redis bağlantı hatası:', error);
-      throw error;
+      // Don't throw error, just log it
     }
   }
 
   // Gelir-gider verilerini önbellekle
   async cacheTransactions(userId, transactions) {
     try {
+      if (!this.client) {
+        console.log('Redis client not connected, skipping cache');
+        return;
+      }
       const key = `transactions:${userId}`;
       await this.client.set(key, JSON.stringify(transactions), {
         EX: this.CACHE_TTL
       });
-      console.log(`Gelir-gider verileri önbelleklendi: ${key}`);
+      console.log(`İşlemler önbelleklendi: ${key}`);
     } catch (error) {
       console.error('Önbellekleme hatası:', error);
     }
@@ -38,6 +50,10 @@ class RedisService {
   // Önbellekten gelir-gider verilerini al
   async getCachedTransactions(userId) {
     try {
+      if (!this.client) {
+        console.log('Redis client not connected, skipping cache retrieval');
+        return null;
+      }
       const key = `transactions:${userId}`;
       const data = await this.client.get(key);
       return data ? JSON.parse(data) : null;
@@ -50,6 +66,10 @@ class RedisService {
   // Önbellekten gelir-gider verilerini sil
   async invalidateTransactionsCache(userId) {
     try {
+      if (!this.client) {
+        console.log('Redis client not connected, skipping cache invalidation');
+        return;
+      }
       const key = `transactions:${userId}`;
       await this.client.del(key);
       console.log(`Önbellek temizlendi: ${key}`);
@@ -61,6 +81,10 @@ class RedisService {
   // Aylık toplam gelir-gider verilerini önbellekle
   async cacheMonthlyTotals(userId, totals) {
     try {
+      if (!this.client) {
+        console.log('Redis client not connected, skipping cache');
+        return;
+      }
       const key = `monthly_totals:${userId}`;
       await this.client.set(key, JSON.stringify(totals), {
         EX: this.CACHE_TTL
@@ -74,6 +98,10 @@ class RedisService {
   // Önbellekten aylık toplam gelir-gider verilerini al
   async getCachedMonthlyTotals(userId) {
     try {
+      if (!this.client) {
+        console.log('Redis client not connected, skipping cache retrieval');
+        return null;
+      }
       const key = `monthly_totals:${userId}`;
       const data = await this.client.get(key);
       return data ? JSON.parse(data) : null;
@@ -86,6 +114,10 @@ class RedisService {
   // Önbellekten aylık toplam gelir-gider verilerini sil
   async invalidateMonthlyTotalsCache(userId) {
     try {
+      if (!this.client) {
+        console.log('Redis client not connected, skipping cache invalidation');
+        return;
+      }
       const key = `monthly_totals:${userId}`;
       await this.client.del(key);
       console.log(`Aylık toplam önbelleği temizlendi: ${key}`);
@@ -102,7 +134,6 @@ class RedisService {
       }
     } catch (error) {
       console.error('Redis kapatma hatası:', error);
-      throw error;
     }
   }
 }

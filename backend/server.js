@@ -13,8 +13,12 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:3000',
-  credentials: true
+  origin: process.env.NODE_ENV === 'production'
+    ? ['https://cebim-frontend.vercel.app', 'https://cebim15.vercel.app']
+    : 'http://localhost:3000',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
 }));
 app.use(express.json());
 app.use(session({
@@ -72,6 +76,7 @@ app.use('/transactions', require('./routes/transactions'));
 app.use('/reminders', require('./routes/reminders'));
 app.use('/goals', require('./routes/goals'));
 app.use('/articles', require('./routes/articles'));
+app.use('/news', require('./routes/news'));
 
 // Basic route
 app.get('/', (req, res) => {

@@ -9,7 +9,12 @@ class RabbitMQService {
 
   async connect() {
     try {
-      this.connection = await amqp.connect('amqp://localhost');
+      if (!process.env.RABBITMQ_URL) {
+        console.log('RABBITMQ_URL not set, RabbitMQ will not be used');
+        return;
+      }
+
+      this.connection = await amqp.connect(process.env.RABBITMQ_URL);
       this.channel = await this.connection.createChannel();
       await this.channel.assertQueue(this.QUEUE_NAME, {
         durable: true
@@ -17,7 +22,7 @@ class RabbitMQService {
       console.log('RabbitMQ bağlantısı başarılı');
     } catch (error) {
       console.error('RabbitMQ bağlantı hatası:', error);
-      throw error;
+      // Don't throw error, just log it
     }
   }
 
@@ -25,6 +30,11 @@ class RabbitMQService {
     try {
       if (!this.channel) {
         await this.connect();
+      }
+
+      if (!this.channel) {
+        console.log('RabbitMQ not available, skipping reminder queue');
+        return;
       }
       
       const message = {
@@ -47,7 +57,7 @@ class RabbitMQService {
       console.log('Hatırlatıcı kuyruğa eklendi:', message);
     } catch (error) {
       console.error('Hatırlatıcı gönderme hatası:', error);
-      throw error;
+      // Don't throw error, just log it
     }
   }
 
@@ -61,7 +71,7 @@ class RabbitMQService {
       }
     } catch (error) {
       console.error('RabbitMQ kapatma hatası:', error);
-      throw error;
+      // Don't throw error, just log it
     }
   }
 }

@@ -14,17 +14,23 @@ router.get('/', passport.authenticate('jwt', { session: false }), async (req, re
       return res.json(cachedTransactions);
     }
 
-    // Önbellekte yoksa veritabanından al
+    // Önbellekte yoksa veya hata varsa veritabanından al
     const transactions = await Transaction.find({ userId: req.user._id })
       .sort({ date: -1 });
     
-    // Verileri önbelleğe kaydet
-    await redisService.cacheTransactions(req.user._id, transactions);
-    console.log('İşlemler veritabanından alındı ve önbelleğe kaydedildi');
+    // Verileri önbelleğe kaydet (hata olsa bile devam et)
+    try {
+      await redisService.cacheTransactions(req.user._id, transactions);
+      console.log('İşlemler veritabanından alındı ve önbelleğe kaydedildi');
+    } catch (cacheError) {
+      console.error('Önbellekleme hatası:', cacheError);
+      // Önbellekleme hatası olsa bile verileri döndür
+    }
     
     res.json(transactions);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('İşlem getirme hatası:', error);
+    res.status(500).json({ message: 'İşlemler yüklenirken bir hata oluştu' });
   }
 });
 
@@ -38,8 +44,9 @@ router.get('/summary', passport.authenticate('jwt', { session: false }), async (
       return res.json(cachedTotals);
     }
 
-    // Önbellekte yoksa veritabanından hesapla
+    // Önbellekte yoksa veya hata varsa veritabanından hesapla
     const transactions = await Transaction.find({ userId: req.user._id });
+    
     const totalIncome = transactions
       .filter(t => t.type === 'income')
       .reduce((sum, t) => sum + t.amount, 0);
@@ -54,13 +61,19 @@ router.get('/summary', passport.authenticate('jwt', { session: false }), async (
       netBalance
     };
 
-    // Toplamları önbelleğe kaydet
-    await redisService.cacheMonthlyTotals(req.user._id, summary);
-    console.log('Aylık toplamlar hesaplandı ve önbelleğe kaydedildi');
+    // Toplamları önbelleğe kaydet (hata olsa bile devam et)
+    try {
+      await redisService.cacheMonthlyTotals(req.user._id, summary);
+      console.log('Aylık toplamlar hesaplandı ve önbelleğe kaydedildi');
+    } catch (cacheError) {
+      console.error('Önbellekleme hatası:', cacheError);
+      // Önbellekleme hatası olsa bile verileri döndür
+    }
     
     res.json(summary);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Özet getirme hatası:', error);
+    res.status(500).json({ message: 'İşlem özeti yüklenirken bir hata oluştu' });
   }
 });
 
@@ -78,14 +91,20 @@ router.post('/', passport.authenticate('jwt', { session: false }), async (req, r
 
     const newTransaction = await transaction.save();
     
-    // Önbelleği temizle
-    await redisService.invalidateTransactionsCache(req.user._id);
-    await redisService.invalidateMonthlyTotalsCache(req.user._id);
-    console.log('Yeni işlem eklendi, önbellek temizlendi');
+    // Önbelleği temizle (hata olsa bile devam et)
+    try {
+      await redisService.invalidateTransactionsCache(req.user._id);
+      await redisService.invalidateMonthlyTotalsCache(req.user._id);
+      console.log('Yeni işlem eklendi, önbellek temizlendi');
+    } catch (cacheError) {
+      console.error('Önbellek temizleme hatası:', cacheError);
+      // Önbellek temizleme hatası olsa bile işlemi tamamla
+    }
     
     res.status(201).json(newTransaction);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error('İşlem ekleme hatası:', error);
+    res.status(400).json({ message: 'İşlem eklenirken bir hata oluştu' });
   }
 });
 
@@ -107,14 +126,20 @@ router.put('/:id', passport.authenticate('jwt', { session: false }), async (req,
       return res.status(404).json({ message: 'İşlem bulunamadı' });
     }
     
-    // Önbelleği temizle
-    await redisService.invalidateTransactionsCache(req.user._id);
-    await redisService.invalidateMonthlyTotalsCache(req.user._id);
-    console.log('İşlem güncellendi, önbellek temizlendi');
+    // Önbelleği temizle (hata olsa bile devam et)
+    try {
+      await redisService.invalidateTransactionsCache(req.user._id);
+      await redisService.invalidateMonthlyTotalsCache(req.user._id);
+      console.log('İşlem güncellendi, önbellek temizlendi');
+    } catch (cacheError) {
+      console.error('Önbellek temizleme hatası:', cacheError);
+      // Önbellek temizleme hatası olsa bile işlemi tamamla
+    }
     
     res.json(transaction);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error('İşlem güncelleme hatası:', error);
+    res.status(400).json({ message: 'İşlem güncellenirken bir hata oluştu' });
   }
 });
 
@@ -130,14 +155,20 @@ router.delete('/:id', passport.authenticate('jwt', { session: false }), async (r
       return res.status(404).json({ message: 'İşlem bulunamadı' });
     }
 
-    // Önbelleği temizle
-    await redisService.invalidateTransactionsCache(req.user._id);
-    await redisService.invalidateMonthlyTotalsCache(req.user._id);
-    console.log('İşlem silindi, önbellek temizlendi');
+    // Önbelleği temizle (hata olsa bile devam et)
+    try {
+      await redisService.invalidateTransactionsCache(req.user._id);
+      await redisService.invalidateMonthlyTotalsCache(req.user._id);
+      console.log('İşlem silindi, önbellek temizlendi');
+    } catch (cacheError) {
+      console.error('Önbellek temizleme hatası:', cacheError);
+      // Önbellek temizleme hatası olsa bile işlemi tamamla
+    }
 
     res.json({ message: 'İşlem silindi' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('İşlem silme hatası:', error);
+    res.status(500).json({ message: 'İşlem silinirken bir hata oluştu' });
   }
 });
 

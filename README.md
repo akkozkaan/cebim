@@ -55,6 +55,42 @@ cd frontend
 npm start
 ```
 
+## Deployment
+
+### Deploying to Vercel
+
+1. Install Vercel CLI:
+```bash
+npm install -g vercel
+```
+
+2. Deploy Frontend:
+```bash
+cd frontend
+vercel
+```
+
+3. Deploy Backend:
+```bash
+cd backend
+vercel
+```
+
+4. Set up environment variables in Vercel dashboard for both frontend and backend projects.
+
+5. Configure the following environment variables in Vercel:
+   - `MONGODB_URI`
+   - `REDIS_URL`
+   - `RABBITMQ_URL`
+   - `JWT_SECRET`
+   - `GOOGLE_CLIENT_ID`
+   - `GOOGLE_CLIENT_SECRET`
+   - `EMAIL_SERVICE`
+   - `EMAIL_USER`
+   - `EMAIL_PASS`
+
+6. After deployment, update the frontend's API configuration to point to the deployed backend URL.
+
 ## Features
 
 - User authentication

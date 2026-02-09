@@ -101,24 +101,29 @@ app.get('/', (req, res) => {
   res.json({ message: 'Welcome to the backend API' });
 });
 
-// Start server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+// Export for Vercel serverless
+module.exports = app;
 
-// Uygulama kapatıldığında bağlantıları kapat
-process.on('SIGINT', async () => {
-  try {
-    await Promise.all([
-      rabbitmqService.close(),
-      reminderConsumer.close()
-    ]);
-    console.log('Bağlantılar kapatıldı');
-    await redisService.close();
-    process.exit(0);
-  } catch (error) {
-    console.error('Kapatma hatası:', error);
-    process.exit(1);
-  }
-}); 
+// Start server only in non-serverless environment
+if (process.env.VERCEL !== '1') {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+
+  // Uygulama kapatıldığında bağlantıları kapat
+  process.on('SIGINT', async () => {
+    try {
+      await Promise.all([
+        rabbitmqService.close(),
+        reminderConsumer.close()
+      ]);
+      console.log('Bağlantılar kapatıldı');
+      await redisService.close();
+      process.exit(0);
+    } catch (error) {
+      console.error('Kapatma hatası:', error);
+      process.exit(1);
+    }
+  });
+} 

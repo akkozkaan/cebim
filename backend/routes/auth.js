@@ -1,15 +1,37 @@
 const express = require('express');
 const passport = require('passport');
 const jwt = require('jsonwebtoken');
+const connectDB = require('../config/database');
 const router = express.Router();
 
 // Google OAuth login route
 router.get('/google',
+  async (req, res, next) => {
+    try {
+      await connectDB();
+      next();
+    } catch (error) {
+      console.error('Database connection error:', error);
+      res.status(500).json({ error: 'Database connection failed' });
+    }
+  },
   passport.authenticate('google', { scope: ['profile', 'email'] })
 );
 
 // Google OAuth callback route
 router.get('/google/callback',
+  async (req, res, next) => {
+    try {
+      await connectDB();
+      next();
+    } catch (error) {
+      console.error('Database connection error:', error);
+      const frontendUrl = process.env.NODE_ENV === 'production'
+        ? 'https://cebim-frontend.vercel.app'
+        : 'http://localhost:3000';
+      return res.redirect(`${frontendUrl}/login?error=database`);
+    }
+  },
   passport.authenticate('google', { failureRedirect: '/login' }),
   (req, res) => {
     const token = jwt.sign({ id: req.user._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
@@ -21,8 +43,20 @@ router.get('/google/callback',
 );
 
 // Get current user
-router.get('/me', passport.authenticate('jwt', { session: false }), (req, res) => {
-  res.json(req.user);
-});
+router.get('/me', 
+  async (req, res, next) => {
+    try {
+      await connectDB();
+      next();
+    } catch (error) {
+      console.error('Database connection error:', error);
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+  },
+  passport.authenticate('jwt', { session: false }), 
+  (req, res) => {
+    res.json(req.user);
+  }
+);
 
 module.exports = router; 

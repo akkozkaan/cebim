@@ -3,6 +3,7 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const JwtStrategy = require('passport-jwt').Strategy;
 const ExtractJwt = require('passport-jwt').ExtractJwt;
 const User = require('../models/User');
+const connectDB = require('./database');
 
 const isProduction = process.env.NODE_ENV === 'production';
 const callbackURL = isProduction
@@ -18,6 +19,9 @@ passport.use(new GoogleStrategy({
   },
   async function(accessToken, refreshToken, profile, cb) {
     try {
+      // Ensure database connection in serverless environment
+      await connectDB();
+      
       let user = await User.findOne({ googleId: profile.id });
       
       if (!user) {
@@ -31,6 +35,7 @@ passport.use(new GoogleStrategy({
       
       return cb(null, user);
     } catch (error) {
+      console.error('Google OAuth error:', error);
       return cb(error, null);
     }
   }
@@ -44,12 +49,14 @@ const options = {
 
 passport.use(new JwtStrategy(options, async (jwt_payload, done) => {
   try {
+    await connectDB();
     const user = await User.findById(jwt_payload.id);
     if (user) {
       return done(null, user);
     }
     return done(null, false);
   } catch (error) {
+    console.error('JWT Strategy error:', error);
     return done(error, false);
   }
 }));
@@ -60,9 +67,11 @@ passport.serializeUser((user, done) => {
 
 passport.deserializeUser(async (id, done) => {
   try {
+    await connectDB();
     const user = await User.findById(id);
     done(null, user);
   } catch (error) {
+    console.error('Deserialize user error:', error);
     done(error, null);
   }
 });

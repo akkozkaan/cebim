@@ -6,6 +6,7 @@ const session = require('express-session');
 const rabbitmqService = require('./services/rabbitmq');
 const reminderConsumer = require('./services/reminderConsumer');
 const redisService = require('./services/redis');
+const connectDB = require('./config/database');
 require('dotenv').config();
 require('./config/passport');
 
@@ -29,46 +30,63 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-// MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => console.log('MongoDB connected successfully'))
-.catch((err) => console.log('MongoDB connection error:', err));
+// MongoDB Connection with serverless optimization
+connectDB().catch((err) => {
+  console.error('Initial MongoDB connection failed:', err);
+  // In serverless, connection will retry on next request
+});
 
 // RabbitMQ bağlantısı ve consumer başlatma
 async function startRabbitMQ() {
+  // Skip RabbitMQ in production/serverless if not configured
+  if (!process.env.RABBITMQ_URL) {
+    console.log('RabbitMQ URL not configured, skipping RabbitMQ services');
+    return;
+  }
+
   try {
     console.log('RabbitMQ servisleri başlatılıyor...');
     
     // Önce RabbitMQ servisini başlat
     await rabbitmqService.connect();
-    console.log('RabbitMQ servisi başlatıldı');
     
-    // Sonra consumer'ı başlat
-    await reminderConsumer.connect();
-    console.log('Reminder Consumer bağlantısı kuruldu');
-    
-    // Consumer'ı başlat
-    await reminderConsumer.startConsuming();
-    console.log('Reminder Consumer başlatıldı');
-    
+    // Sadece bağlantı başarılıysa devam et
+    if (rabbitmqService.channel) {
+      console.log('RabbitMQ servisi başlatıldı');
+      
+      // Sonra consumer'ı başlat
+      await reminderConsumer.connect();
+      
+      if (reminderConsumer.channel) {
+        console.log('Reminder Consumer bağlantısı kuruldu');
+        
+        // Consumer'ı başlat
+        await reminderConsumer.startConsuming();
+        console.log('Reminder Consumer başlatıldı');
+      }
+    } else {
+      console.log('RabbitMQ connection failed, skipping consumer');
+    }
   } catch (error) {
     console.error('RabbitMQ başlatma hatası:', error);
-    // Hata durumunda 5 saniye sonra tekrar dene
-    setTimeout(startRabbitMQ, 5000);
+    console.log('Application will continue without RabbitMQ');
+    // Don't retry in production/serverless
   }
 }
 
-// RabbitMQ'yu başlat
+// RabbitMQ'yu başlat (opsiyonel)
 startRabbitMQ();
 
-// Redis bağlantısını başlat
-redisService.connect().catch(err => {
-  console.error('Redis bağlantı hatası:', err);
-  process.exit(1);
-});
+// Redis bağlantısını başlat (opsiyonel)
+if (process.env.REDIS_URL) {
+  redisService.connect().catch(err => {
+    console.error('Redis bağlantı hatası:', err);
+    console.log('Application will continue without Redis');
+    // Don't exit in production
+  });
+} else {
+  console.log('Redis URL not configured, skipping Redis');
+}
 
 // Routes
 app.use('/auth', require('./routes/auth'));
